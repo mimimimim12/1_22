@@ -2,6 +2,8 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
+from wordcloud import WordCloud, STOPWORDS
+from PIL import Image
 
 # 1. 데이터 로드
 
@@ -148,6 +150,103 @@ plt.show()
 
 
 # 연도별 MOVIE & TV show 수치 시각화
+# netflix["year_added"]
+# 그래프 전체 크기를 가로 15, 세로 5로 설정합니다. (연도별 데이터를 길게 보기 위함)
+plt.figure(figsize=(15, 5))
+# Seaborn의 countplot을 사용하여 막대그래프를 그립니다.
+# x='year_added': x축에는 연도 정보를 넣습니다.
+# hue='Category': 영화와 TV쇼를 색상으로 구분하여 나란히 보여줍니다.
+# palette=netflix_palette: 앞서 만든 넷플릭스 전용 색상을 사용합니다.
+sns.countplot(data=netflix, x='year_added', hue='Category', palette=netflix_palette)
+# 그래프 제목과 축 레이블을 예쁘게 꾸밉니다.
+plt.title("Yearly Content Added on Netflix (Movie vs TV Show)", fontsize=20, color='#E50914', pad=20)
+plt.xlabel("Year Added", fontsize=12)
+plt.ylabel("Count of Content", fontsize=12)
+# 범례(Legend) 제목을 정해주고 위치를 조정합니다.
+plt.legend(title="Category")
+# 그래프 출력
+plt.show()
+
+
 # 월별 MOVIE & TV show 수치 시각화
-# 나라별 타겟팅 하는 연령 시각화
-# 워드클라우드 (핵심 단어 시각화)
+# netflix["month_added"]
+# 그래프 전체 크기를 가로 15, 세로 5로 설정합니다.
+plt.figure(figsize=(15, 5))
+# Seaborn의 countplot을 사용하여 월별 막대그래프를 그립니다.
+# x='month_added': x축에 1월~12월 정보를 넣습니다.
+# hue='Category': 영화와 TV쇼를 색상으로 구분합니다.
+# palette=netflix_palette: 우리가 정한 넷플릭스 색상을 적용합니다.
+sns.countplot(data=netflix, x='month_added', hue='Category', palette=netflix_palette)
+# 그래프 제목과 축 레이블을 설정합니다.
+plt.title("Monthly Content Added on Netflix (Movie vs TV Show)", fontsize=20, color='#E50914', pad=20)
+plt.xlabel("Month Added (1: Jan, 12: Dec)", fontsize=12)
+plt.ylabel("Count of Content", fontsize=12)
+# 범례 위치와 제목을 깔끔하게 정리합니다.
+plt.legend(title="Category", loc='upper right')
+# 그래프 출력
+plt.show()
+
+
+
+# 나라별 타겟팅 하는 연령 시각화 (heatmap 사용)
+# netflix["age_group"]
+# 시각화의 가독성을 위해 콘텐츠 수가 많은 상위 10개국만 골라냅니다.
+top_10_countries = netflix['Country'].value_counts().head(10).index
+df_top_countries = netflix[netflix['Country'].isin(top_10_countries)]
+# 국가(Country)와 연령대(age_group)를 기준으로 표(Cross-tab)를 만듭니다.
+# 각 칸에는 해당 국가와 연령대에 속하는 콘텐츠의 개수가 들어갑니다.
+country_age_df = pd.crosstab(df_top_countries['Country'], df_top_countries['age_group'])
+# 연령대 순서를 보기 좋게 정렬합니다. (성인 -> 어린이 순)
+age_order = ['Adults', 'Teens', 'Older Kids', 'Kids']
+# 현재 데이터에 존재하는 컬럼들만 순서대로 골라냅니다.
+available_order = [age for age in age_order if age in country_age_df.columns]
+country_age_df = country_age_df[available_order]
+# 히트맵 그리기
+plt.figure(figsize=(12, 8))
+sns.heatmap(
+    country_age_df, 
+    annot=True,          # 칸 안에 실제 숫자를 표시합니다.
+    fmt="d",             # 숫자를 정수 형태로 보여줍니다.
+    cmap="Reds",         # 넷플릭스 느낌의 빨간색 계열 색상표를 사용합니다.
+    linewidths=.5        # 칸 사이의 간격을 살짝 벌려줍니다.
+)
+# 제목 및 레이블 설정
+plt.title("Target Age Group by Country (Top 10)", fontsize=20, color='#E50914', pad=20)
+plt.xlabel("Age Group", fontsize=12)
+plt.ylabel("Country", fontsize=12)
+# 그래프 출력
+plt.show()
+
+
+
+try:
+    # 1. 이미지 로드 및 그레이스케일 변환
+    mask_image = Image.open('./Netflix_Logo.jpeg').convert('L')
+    mask_array = np.array(mask_image)
+
+    # 2. 배경 정제 (검정 배경용 핵심 로직)
+    # 배경이 검정(0)이므로, 오히려 어두운 부분(배경)을 흰색(255)으로 반전시킵니다.
+    # 이렇게 해야 넷플릭스 로고 글자 부분에만 단어가 채워집니다.
+    mask_array = np.where(mask_array < 50, 255, 0) 
+
+    # 3. 워드클라우드 생성
+    wordcloud = WordCloud(
+        background_color="white",    # 결과물의 바탕색
+        mask=mask_array,             # 전처리된 검정 배경 마스크 적용
+        colormap='Reds',             # 넷플릭스 상징색
+        width=1400,
+        height=1400,
+        max_words=400,               # 모양을 더 뚜렷하게 하기 위해 단어 수를 늘렸습니다
+        stopwords=STOPWORDS,
+        contour_width=1,             # 테두리를 얇게 주어 형태 강조
+        contour_color='#E50914'
+    ).generate(" ".join(netflix["Title"]))
+
+    # 4. 시각화
+    plt.figure(figsize=(15, 10))
+    plt.imshow(wordcloud, interpolation='bilinear')
+    plt.axis("off")
+    plt.show()
+
+except Exception as e:
+    print(f"에러 발생: {e}")
